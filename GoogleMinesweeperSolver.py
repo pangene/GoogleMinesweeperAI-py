@@ -2,7 +2,7 @@
 
 Author: Gene Pan
 Date Began: Aug-02-2020
-Last Edited: Aug-05-2020 3:10 AM
+Last Edited: Aug-05-2020 8:53 PM
 """
 
 import pyautogui, logging, os, sys, cv2
