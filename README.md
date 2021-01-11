@@ -1,6 +1,6 @@
 # Introduction
 
-![GIF of AI in action]()
+![GIF of AI in action](https://github.com/pangene/GoogleMinesweeperAI-py/blob/master/readme_images/example.gif)
 
 The GoogleMinesweeperAI-py recognizes the [Google Minesweeper game](https://www.google.com/fbx?fbx=minesweeper) on your screen and then plays it.
 
