@@ -179,9 +179,10 @@ class MinesweeperCell():
 
     def flag(self):
         """Right clicks on own cell region."""
-        logging.info(f'Flagging cell at {self.coordinate}')
-        pyautogui.rightClick(x=self.center[0], y=self.center[1])
-        self.state = 'F'
+        if self.state != 'F':
+            logging.info(f'Flagging cell at {self.coordinate}')
+            pyautogui.rightClick(x=self.center[0], y=self.center[1])
+            self.state = 'F'
 
 
 class MinesweeperSolver():
@@ -229,7 +230,6 @@ class MinesweeperSolver():
         self.menu_region = None
         self.game_region = None
         self.game_region_size = (None, None)  # Given in pixels
-        self.first_click = True
         self.color_movement = (None, None)
         self.active_cells = []
 
@@ -238,30 +238,29 @@ class MinesweeperSolver():
         """Prepares the solver by bringing up the Minesweeper game if not already present."""
         logging.debug('Clicking play button! If already clicked, nothing should happen.')
 
-        if self.find_menu_bar_region() is not None:  # Searches to see if game is already present on screen
-            logging.debug('Play button already clicked!')
+        self.find_menu_bar_region()
 
+        if self.menu_region:  # Searches to see if game is already present on screen
+            logging.debug('Play button already clicked!')
         else:
             logging.debug('Menu not present! Looking for play button!')
             play_button_pos = pyautogui.locateCenterOnScreen(self.PLAY_BUTTON_IMAGE, confidence = 0.9, grayscale = True)
             logging.info(f'Play button is located at {play_button_pos}')
             assert play_button_pos is not None, 'Google Minesweeper does not seem to be present on screen'
             pyautogui.click(play_button_pos)
+            self.find_menu_bar_region()
 
 
     def find_menu_bar_region(self):
         """Finds the location of the default menu region, regardless of which difficulty it is set to."""
         logging.debug('Searching for menu region')
-
-        if self.menu_region == None:
+        if not self.menu_region:
             self.menu_region = pyautogui.locateOnScreen(self.MENU_BAR_EASY, confidence = 0.9)
-        if self.menu_region == None:
+        if not self.menu_region:
             self.menu_region = pyautogui.locateOnScreen(self.MENU_BAR_MEDIUM, confidence = 0.9)
-        if self.menu_region == None:
+        if not self.menu_region:
             self.menu_region = pyautogui.locateOnScreen(self.MENU_BAR_HARD, confidence = 0.9)
-
         logging.debug(f'Menu region is {self.menu_region}')
-        return self.menu_region
 
 
     def set_difficulty(self):
@@ -328,10 +327,7 @@ class MinesweeperSolver():
                     self.cell_size
                 )
 
-                cell.center = (
-                    cell.cell_region[0] + (cell.cell_region[2] // 2),
-                    cell.cell_region[1] + (cell.cell_region[3] // 2)
-                )
+                cell.center = pyautogui.center(cell.cell_region)
 
                 cell.identify_neighbors()
         self.print_board()
@@ -346,32 +342,32 @@ class MinesweeperSolver():
         self.print_board()
 
 
-    # def identify_all_safe_moves(self):
-    #     """Identifies all moves that are guaranteed to be either mines or safe."""
-
-    def perform_all_safe_moves(self):
-        """Flags or clicks all cells guaranteed to be either mines or safe respectively."""
+    def identify_all_safe_moves(self):
+        """Returns a tuple of all (flag_moves, safe_moves) for the neighbors of the active cells."""
+        flags, safe = [], []
         for cell in self.active_cells[:]:
             logging.info(f'Identifying moves for {cell.coordinate}')
-            flags = cell.get_flags()
-            safe = cell.get_safe()
-            if flags or safe:
+            cell_flags = cell.get_flags()
+            cell_safe = cell.get_safe()
+            if cell_flags or cell_safe:
                 logging.debug(f'Flags: {[cell.coordinate for cell in flags]}, Safe moves: {[cell.coordinate for cell in safe]}')
-            for flag_cell in flags:
-                flag_cell.flag()
-            for safe_cell in safe:
-                safe_cell.click()
+            flags.extend(cell_flags)
+            safe.extend(cell_safe)
+        return (flags, safe)
 
 
-    def click_and_flag(self):
+    def perform_all_safe_moves(self, flags, safe):
+        """Flags or clicks all cells guaranteed to be either mines or safe respectively."""
+        for flag_cell in flags:
+            flag_cell.flag()
+        for safe_cell in safe:
+            safe_cell.click()
+
+
+    def first_click(self):
         """Flags the 100% cells as determined in evaluate_board() and clicks the 0% cells."""
-        logging.debug('Entering clicking and flagging phase!')
-        if self.first_click:
-            logging.debug('Doing first click on center of screen!')
-            pyautogui.click(pyautogui.center(self.game_region))
-        else:
-            self.first_click = False
-            logging.debug('Entering normal phase of clicking and flagging.')
+        logging.debug('Doing first click on center of screen!')
+        pyautogui.click(pyautogui.center(self.game_region))
 
 
 def main():
@@ -379,14 +375,14 @@ def main():
     pass
 m = MinesweeperSolver('medium')
 m.click_play()
-m.find_menu_bar_region()
+# m.find_menu_bar_region()
 m.set_difficulty()
 m.find_game_region()
+m.first_click()
 m.generate_board()
-m.click_and_flag()
 m.update_board()
-m.perform_all_safe_moves()
-m.print_board()
+flags, safe = m.identify_all_safe_moves()
+m.perform_all_safe_moves(flags, safe)
 
 # if __name__ == '__main__':
 #     main()
