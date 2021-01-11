@@ -18,7 +18,9 @@ pyautogui.PAUSE = 0
 #     datefmt='%Y-%m-%d:%H:%M:%S',
 #     level=logging.DEBUG)
 
-logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(asctime)s.%(msecs)03d: [%(lineno)d] %(message)s', datefmt='%H:%M:%S')
+logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(asctime)s.%(msecs)03d: [%(lineno)d] %(message)s', datefmt='%H:%M:%S',
+    # filename='testlog.log'
+)
 # logging.disable(logging.info) # uncomment to block debug log messages
 
 # TODO: The actual AI part
@@ -36,15 +38,15 @@ class MinesweeperCell():
     BLANK_COLOR_1 = (215, 184, 153)  
     BLANK_COLOR_2 = (229, 194, 159)
     ONE_COLOR = (25, 118, 210)
-    TWO_COLOR = (69, 146, 67)
+    TWO_COLOR = (56, 142, 60)
     THREE_COLOR = (211, 47, 47)
     FOUR_COLOR = (155, 85, 159)
     FIVE_COLOR = (254, 144, 3)
 
-    COLOR_TOLERANCE = 40  # Distance in RGB value
+    COLOR_TOLERANCE = 60  # Distance in RGB value
     POSITION_TOLERANCE = 5  # how many pixels around center will the color be searched for
 
-    CLICK_WAIT = 0.2  # Time to wait until updating cell after clicking
+    CLICK_WAIT = 0.4  # Time to wait until updating cell after clicking
 
 
     def __init__(self, ms_solver, coordinate):
@@ -59,20 +61,21 @@ class MinesweeperCell():
         self.center = (None, None)
 
 
-    def __repr__(self):
+    def __str__(self):
         return self.state
+
+
+    def __repr__(self):
+        return f'{self.coordinate}'
 
 
     def identify_neighbors(self):
         for x in range(self.coordinate[0] - 1, self.coordinate[0] + 2):
             for y in range(self.coordinate[1] - 1, self.coordinate[1] + 2):
-                if (x, y) != self.coordinate:
-                    try:
-                        neighbor = self.parent.board[y][x]
-                        self.neighbors.append(neighbor)
-                        logging.debug(f'Neighbor for cell at ({self.coordinate[0], self.coordinate[1]}): ({x}, {y})')
-                    except IndexError:
-                        logging.debug('Neighbor does not exist. Likely edge/corner cell.')
+                if (x, y) != self.coordinate and 0 <= x < self.parent.board_size[0] and 0 <= y < self.parent.board_size[1]:
+                    logging.debug(f'Neighbor for cell at ({self.coordinate[0], self.coordinate[1]}): ({x}, {y})')
+                    neighbor = self.parent.board[y][x]
+                    self.neighbors.append(neighbor)
 
 
     def get_neighbors_of(self, state):
@@ -85,6 +88,7 @@ class MinesweeperCell():
 
 
     def color_match(self, color):
+        # pyautogui.moveTo(x=1000, y=1000)
         logging.info(f'Checking color at {self.coordinate}')
         img = pyautogui.screenshot(region=self.cell_region)
         img_rgb = img.convert('RGB')
@@ -103,6 +107,7 @@ class MinesweeperCell():
         for x in range(self.parent.cell_size // 2 - self.POSITION_TOLERANCE, self.parent.cell_size // 2 + self.POSITION_TOLERANCE):  # Checks color within certain x range
             logging.debug(f'X: {x}, Y: {self.parent.cell_size // 2}')
             rgb_pixel = img_rgb.getpixel((x, self.parent.cell_size // 2))
+            logging.debug(f'RGB: {rgb_pixel}')
             pixel_color_rgb = zip(rgb_pixel, color)
             color_in_pixel = all(map(lambda x: within_range(x[0], x[1], self.COLOR_TOLERANCE), pixel_color_rgb))
             if color_in_pixel and not search_all:
@@ -117,39 +122,44 @@ class MinesweeperCell():
     def update(self):
         """Updates the cell's state."""
         # This looks disgusting and is disgusting
-        if not (self.state == '-' or self.state == 'U'):
-            return
-
-        if self.color_match(self.HIDDEN_COLOR_1) or self.color_match(self.HIDDEN_COLOR_2):
-            self.state = '-'
-        elif self.color_match(self.BLANK_COLOR_1) or self.color_match(self.BLANK_COLOR_2):
-            self.state = '0'
-            self.mines_remaining = 0
-        elif self.color_match(self.ONE_COLOR):
-            self.state = '1'
-        elif self.color_match(self.TWO_COLOR):
-            self.state = '2'
-        elif self.color_match(self.THREE_COLOR):
-            self.state = '3'
-        elif self.color_match(self.FOUR_COLOR):
-            self.state = '4'
-        elif self.color_match(self.FIVE_COLOR):
-            self.state = '5'
-        else:
-            logging.debug('Failed to identify color.')
-            self.state = 'E'
+        if self.state == '-' or self.state == 'U':
+            if self.color_match(self.HIDDEN_COLOR_1) or self.color_match(self.HIDDEN_COLOR_2):
+                self.state = '-'
+            elif self.color_match(self.BLANK_COLOR_1) or self.color_match(self.BLANK_COLOR_2):
+                self.state = '0'
+                self.mines_remaining = 0
+            elif self.color_match(self.ONE_COLOR):
+                self.state = '1'
+            elif self.color_match(self.TWO_COLOR):
+                self.state = '2'
+            elif self.color_match(self.THREE_COLOR):
+                self.state = '3'
+            elif self.color_match(self.FOUR_COLOR):
+                self.state = '4'
+            elif self.color_match(self.FIVE_COLOR):
+                self.state = '5'
+            else:
+                logging.debug('Failed to identify color.')
+                img = pyautogui.screenshot('failed_image.png', region=self.cell_region)  # Saves failed image as PNG for debugging
+                raise Exception('Color Indentification Failed')
 
         self.update_mines_remaining()
 
-        if self.mines_remaining and self not in self.parent.active_cells:
+        if self.state not in ('-', 'F') and self.get_neighbors_of('-') and self not in self.parent.active_cells:
             self.parent.active_cells.append(self)
+
+
+    def update_neighbors(self):
+        for neighbor in self.neighbors:
+            neighbor.update()
 
 
     def update_mines_remaining(self):
         """Updates the number of mines remaining."""
         neighbor_flags_amt = len(self.get_neighbors_of('F'))
-        if self.state != '-':
+        if self.state != '-' and self.state != 'F':
             self.mines_remaining = int(self.state) - neighbor_flags_amt
+
 
     def get_flags(self):
         """Returns a list of all neighbor cells that are guaranteed to be flags."""
@@ -176,6 +186,8 @@ class MinesweeperCell():
         self.update()
         if self.state == '0':
             self.parent.update_board()
+        self.update_neighbors()
+
 
     def flag(self):
         """Right clicks on own cell region."""
@@ -183,6 +195,7 @@ class MinesweeperCell():
             logging.info(f'Flagging cell at {self.coordinate}')
             pyautogui.rightClick(x=self.center[0], y=self.center[1])
             self.state = 'F'
+        # self.update_neighbors()
 
 
 class MinesweeperSolver():
@@ -211,12 +224,6 @@ class MinesweeperSolver():
     GAME_REGION_SIZE_MEDIUM = (540, 480)
     GAME_REGION_SIZE_HARD = (600, 560)
 
-    # This program detects the state of the cell using its distinct color at a specific location.
-    # This specific location is found (x, y) relative to the top left corner of each cell:
-    # TODO: Find color movements for easy and hard
-    EASY_COLOR_MOVEMENT = (None, None)
-    MEDIUM_COLOR_MOVEMENT = (16, 14)
-    HARD_COLOR_MOVEMENT = (None, None)
 
     def __init__(self, difficulty = 'medium'):
         """Initializes accounting for difficulty."""
@@ -230,7 +237,6 @@ class MinesweeperSolver():
         self.menu_region = None
         self.game_region = None
         self.game_region_size = (None, None)  # Given in pixels
-        self.color_movement = (None, None)
         self.active_cells = []
 
 
@@ -277,7 +283,6 @@ class MinesweeperSolver():
             self.board_size = self.BOARD_SIZE_EASY
             self.cell_size = self.CELL_SIZE_EASY
             self.game_region_size = self.GAME_REGION_SIZE_EASY
-            self.color_movement = self.EASY_COLOR_MOVEMENT
 
         elif self.difficulty.lower() == 'hard':
             pyautogui.moveRel(0, 70)  # Appropriate amount of movement to select hard
@@ -285,7 +290,6 @@ class MinesweeperSolver():
             self.board_size = self.BOARD_SIZE_HARD
             self.cell_size = self.CELL_SIZE_HARD
             self.game_region_size = self.GAME_REGION_SIZE_HARD
-            self.color_movement = self.HARD_COLOR_MOVEMENT
 
         else:  # difficulty = medium
             pyautogui.moveRel(0, 45)  # Appropriate amount of movement to select medium
@@ -293,7 +297,6 @@ class MinesweeperSolver():
             self.board_size = self.BOARD_SIZE_MEDIUM
             self.cell_size = self.CELL_SIZE_MEDIUM
             self.game_region_size = self.GAME_REGION_SIZE_MEDIUM
-            self.color_movement = self.MEDIUM_COLOR_MOVEMENT
 
 
     def find_game_region(self):
@@ -350,7 +353,7 @@ class MinesweeperSolver():
             cell_flags = cell.get_flags()
             cell_safe = cell.get_safe()
             if cell_flags or cell_safe:
-                logging.debug(f'Flags: {[cell.coordinate for cell in flags]}, Safe moves: {[cell.coordinate for cell in safe]}')
+                logging.debug(f'Flags: {[cell.coordinate for cell in cell_flags]}, Safe moves: {[cell.coordinate for cell in cell_safe]}')
             flags.extend(cell_flags)
             safe.extend(cell_safe)
         return (flags, safe)
@@ -364,25 +367,42 @@ class MinesweeperSolver():
             safe_cell.click()
 
 
+    def remove_inactive_cells(self):
+        """Removes inactive cells from self.active_cells."""
+        for cell in self.active_cells[:]:
+            if not cell.get_neighbors_of('-'):
+                self.active_cells.remove(cell)
+
+
     def first_click(self):
-        """Flags the 100% cells as determined in evaluate_board() and clicks the 0% cells."""
+        """Performs the first click to reveal the initial cell plot"""
         logging.debug('Doing first click on center of screen!')
         pyautogui.click(pyautogui.center(self.game_region))
+
+
+    def event_loop(self):
+        """Enters the repeating phases of reading and clicking cells."""
+        logging.info('Entering the event loop.')
+        flags, safe = self.identify_all_safe_moves()
+        while flags or safe:
+            self.perform_all_safe_moves(flags, safe)
+            self.remove_inactive_cells()
+            flags, safe = self.identify_all_safe_moves()
+            self.print_board()
 
 
 def main():
     """The main control loop"""
     pass
-m = MinesweeperSolver('medium')
+m = MinesweeperSolver('easy')
 m.click_play()
-# m.find_menu_bar_region()
 m.set_difficulty()
+time.sleep(0.1)
 m.find_game_region()
 m.first_click()
 m.generate_board()
 m.update_board()
-flags, safe = m.identify_all_safe_moves()
-m.perform_all_safe_moves(flags, safe)
+m.event_loop()
 
 # if __name__ == '__main__':
 #     main()
