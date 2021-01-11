@@ -2,14 +2,14 @@
 
 Author: Gene Pan
 Date Began: Aug-02-2020
-Last Edited: Jan-10-2021
+Last Edited: Jan-11-2021
 """
 
 import os
 import time
 import logging
 import pyautogui
-import cv2  # Necessary for pyautogui's confidence
+import cv2  # Necessary for pyautogui's confidence, but a refactor can probably make it obsolete
 from PIL import Image
 pyautogui.PAUSE = 0
 
@@ -19,11 +19,10 @@ pyautogui.PAUSE = 0
 #     level=logging.DEBUG)
 
 logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(asctime)s.%(msecs)03d: [%(lineno)d] %(message)s', datefmt='%H:%M:%S',
-    # filename='testlog.log'
+    # filename='testlog.log'  # Uncomment to record logging data to a file
 )
 # logging.disable(logging.info) # uncomment to block debug log messages
 
-# TODO: The actual AI part
 
 def im_path(filename):
     """Returns the relative path for the image."""
@@ -48,6 +47,8 @@ class MinesweeperCell():
 
     CLICK_WAIT = 0.4  # Time to wait until updating cell after clicking
 
+    FAILURE_LIMIT = 2  # How many times can the color fail to be identified before raising exception
+
 
     def __init__(self, ms_solver, coordinate):
         logging.debug(f'Creating cell at {coordinate}')
@@ -59,6 +60,7 @@ class MinesweeperCell():
         self.neighbors = []
         self.mines_remaining = None
         self.center = (None, None)
+        self.identification_failures = 0
 
 
     def __str__(self):
@@ -141,7 +143,12 @@ class MinesweeperCell():
             else:
                 logging.debug('Failed to identify color.')
                 img = pyautogui.screenshot('failed_image.png', region=self.cell_region)  # Saves failed image as PNG for debugging
-                raise Exception('Color Indentification Failed')
+                if self.identification_failures > self.FAILURE_LIMIT:
+                    # Instant failure is bad since sometimes, little green animation squares fall from above onto image to cause failure.
+                    # Partly accounted for with waiting, but can fall from any cell above self
+                    raise Exception('Color Indentification Failed')
+                self.identification_failures += 1
+                self.update()
 
         self.update_mines_remaining()
 
@@ -231,7 +238,7 @@ class MinesweeperSolver():
 
         self.difficulty = difficulty
         self.menu_bar_image = im_path('menu_bar_' + self.difficulty.lower() + '.png')
-        self.board = []
+        self.board = []  # Ideally, this would be a GameState class or something.
         self.board_size = (None, None)  # Gives board size as a tuple of (x, y) AKA (columns, rows) in cells
         self.cell_size = None
         self.menu_region = None
@@ -380,6 +387,16 @@ class MinesweeperSolver():
         pyautogui.click(pyautogui.center(self.game_region))
 
 
+    def set_up(self):
+        """Performs all the setup, pre-event_loop functions."""
+        self.click_play()
+        self.set_difficulty()
+        time.sleep(0.1)
+        self.find_game_region()
+        self.first_click()
+        self.generate_board()
+        self.update_board()
+
     def event_loop(self):
         """Enters the repeating phases of reading and clicking cells."""
         logging.info('Entering the event loop.')
@@ -392,17 +409,13 @@ class MinesweeperSolver():
 
 
 def main():
-    """The main control loop"""
-    pass
-m = MinesweeperSolver('easy')
-m.click_play()
-m.set_difficulty()
-time.sleep(0.1)
-m.find_game_region()
-m.first_click()
-m.generate_board()
-m.update_board()
-m.event_loop()
+    print('Pick a difficulty: \n(0) easy, \n(1) medium, \n(2) hard.')
+    difficulty = int(input())
+    difficulty = ['easy', 'medium', 'hard'][difficulty]
+    m = MinesweeperSolver(difficulty)
+    m.set_up()
+    m.event_loop()
+    print('Either the game is over, or the AI can no longer help.')
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
