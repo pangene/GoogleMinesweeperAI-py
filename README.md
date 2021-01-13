@@ -18,8 +18,6 @@ The GoogleMinesweeperAI-py recognizes the [Google Minesweeper game](https://www.
 
 # Detailed Overview
 
-I began this project in Summer 2020, and then got distracted with the upcoming university semester. I then came back to this in Winter 2021, and finished it up. So, be aware, you may wonder why I did things in some ways and the answer is that I forgot how I originally planned on doing them.
-
 First, this program asks you what difficulty of Minesweeper you want to play on. 
 
 Then, it enters the setup phase. The program tries to identify the Google Minesweeper game on your primary monitor. It can do this either through the play button you can see right after typing "Minesweeper" into the Google searchbar, or it can identify the game once play has already been pressed (this is the default if you go to the [Google Minesweeper site](https://www.google.com/fbx?fbx=minesweeper) itself and not typing it into the search bar). It clicks play if it needs to. It sets up some variables based off the difficulty after that, and also picks the difficulty you chose. It then looks for the game region and performs the first click. From there, it begins to simulate the minesweeper game.
