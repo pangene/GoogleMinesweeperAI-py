@@ -4,7 +4,7 @@
 
 The GoogleMinesweeperAI-py recognizes the [Google Minesweeper game](https://www.google.com/fbx?fbx=minesweeper) on your screen and then plays it.
 
-######WARNING: this program has only been tested on a 1920 x 1200 screen. It may not work on other screen sizes depending on how the Google Minesweeper application resizes itself.
+###### WARNING: this program has only been tested on a 1920 x 1200 screen. It may not work on other screen sizes depending on how the Google Minesweeper application resizes itself.
 
 # Installation
 
